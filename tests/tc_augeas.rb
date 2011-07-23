@@ -7,6 +7,7 @@ $:.unshift(File::join(TOPDIR, "ext", "augeas"))
 
 require 'augeas'
 require 'fileutils'
+require 'tempfile'
 
 class TestAugeas < Test::Unit::TestCase
 
@@ -193,6 +194,25 @@ class TestAugeas < Test::Unit::TestCase
         assert_equal(29..37, span[:label])
         assert_equal(38..39, span[:value])
         assert_equal(29..40, span[:span])
+    end
+
+    def test_srun
+        aug = aug_open
+
+        buffile = Tempfile.new('aug_srun')
+        buffer = buffile.open
+        buffile.unlink
+
+        path = "/files/etc/hosts/*[canonical='localhost.localdomain']/ipaddr"
+        assert_equal(1, aug.srun(buffer, "get #{path}\n"))
+        buffer.rewind
+
+        assert_equal("#{path} = 127.0.0.1\n", buffer.read)
+        buffer.rewind
+
+        assert_equal(-1, aug.srun(buffer, "foo"))
+        assert_equal(-1, aug.srun(buffer, "set"))
+        assert_equal(-2, aug.srun(buffer, "quit"))
     end
 
     private

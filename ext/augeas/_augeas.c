@@ -20,6 +20,7 @@
  * Author: Bryan Kearney <bkearney@redhat.com>
  */
 #include <ruby.h>
+#include <rubyio.h>
 #include <augeas.h>
 
 static VALUE c_augeas;
@@ -383,6 +384,36 @@ VALUE augeas_span(VALUE s, VALUE path) {
     return result;
 }
 
+/*
+ * call-seq:
+ *   srun(OUTPUTIO, COMMANDS) -> int
+ *
+ * Run one or more newline-separated commands. The output of the commands
+ * will be printed to OUTPUTIO (a file IO object).
+ *
+ * Returns:
+ * the number of executed commands on success, -1 on failure, and -2 if a
+ * 'quit' command was encountered
+ */
+VALUE augeas_srun(VALUE s, VALUE fout, VALUE text) {
+    augeas *aug = aug_handle(s);
+    const char *ctext = StringValueCStr(text);
+
+    if (NIL_P(fout) || TYPE(fout) != T_FILE) {
+        rb_raise(rb_eSystemCallError, "File-based IO object required");
+    }
+
+    rb_io_t *fptr;
+    FILE *f;
+
+    GetOpenFile(fout, fptr);
+    rb_io_check_writable(fptr);
+    f = GetWriteFile(fptr);
+
+    int r = aug_srun(aug, f, ctext);
+    return INT2FIX(r);
+}
+
 void Init__augeas() {
 
     /* Define the ruby class */
@@ -414,6 +445,8 @@ void Init__augeas() {
     DEF_AUG_ERR(ESYNTAX);
     DEF_AUG_ERR(ENOLENS);
     DEF_AUG_ERR(EMXFM);
+    DEF_AUG_ERR(ENOSPAN);
+    DEF_AUG_ERR(ECMDRUN);
 #undef DEF_AUG_ERR
 
     /* Define the methods */
@@ -433,6 +466,7 @@ void Init__augeas() {
     rb_define_method(c_augeas, "close", augeas_close, 0);
     rb_define_method(c_augeas, "error", augeas_error, 0);
     rb_define_method(c_augeas, "span", augeas_span, 1);
+    rb_define_method(c_augeas, "srun", augeas_srun, 2);
 }
 
 /*
